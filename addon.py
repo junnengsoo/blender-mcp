@@ -14,7 +14,7 @@ import shutil
 from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 import io
 from contextlib import redirect_stdout
-
+import base64
 bl_info = {
     "name": "Blender MCP",
     "author": "BlenderMCP",
@@ -1077,27 +1077,27 @@ class BlenderMCPServer:
                 return f"Error: Unknown Hyper3D Rodin mode!"
 
     def create_rodin_job_main_site(
-            self,
-            text_prompt: str=None,
-            image_path: str=None,  # Changed from images to image_path
-            bbox_condition=None
-        ):
+        self,
+        text_prompt: str=None,
+        images: list[tuple[str, str]]=None,
+        bbox_condition=None
+    ):
         try:
+            if images is None:
+                images = []
             """Call Rodin API, get the job uuid and subscription key"""
             files = {}
 
-            # Handle image
-            if image_path:
-                # Open the image file and send it as a file object
-                files['images'] = open(image_path, 'rb')
-
-            # Add other parameters
-            files['tier'] = (None, "Regular")
-
             if text_prompt:
-                files['prompt'] = (None, text_prompt)
+                files["prompt"] = text_prompt
             if bbox_condition:
-                files['bbox_condition'] = (None, json.dumps(bbox_condition))
+                files["bbox_condition"] = json.dumps(bbox_condition)
+
+            # Add images after converting from base64 to binary
+            for _, img in images:
+                # Convert base64 to binary
+                binary_img = base64.b64decode(img)
+                files["images"] = binary_img
 
             response = requests.post(
                 "https://hyperhuman.deemos.com/api/v2/rodin",
@@ -1110,10 +1110,6 @@ class BlenderMCPServer:
             return data
         except Exception as e:
             return {"error": str(e)}
-        finally:
-            # Make sure to close the file if it was opened
-            if 'images' in files:
-                files['images'].close()
 
     def create_rodin_job_fal_ai(
             self,
